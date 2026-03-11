@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#ffffff" />
+  <link rel="manifest" href="manifest.json" />
+  <title>Strength Tracker</title>
+  <style>
+    :root {
+      --bg: #ffffff; --text: #111111; --muted: #666666; --border: #d8d8d8;
+      --card: #fafafa; --nav-bg: #ffffff; --nav-active: #111111; --nav-inactive: #7a7a7a;
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    * { box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; margin: 0; color: var(--text); background: var(--bg); }
+    .app { padding: 18px 16px 100px; max-width: 900px; margin: 0 auto; }
+    h1, h2, h3 { margin: 0 0 10px; } h1 { font-size: 28px; }
+    .version { font-size: 13px; color: var(--muted); margin-bottom: 18px; }
+    label { display: block; margin-top: 12px; font-weight: bold; }
+    input, select, textarea, button { font: inherit; }
+    input, select, textarea {
+      width: 100%; padding: 12px; margin-top: 6px; border: 1px solid var(--border);
+      border-radius: 10px; background: #fff;
+    }
+    textarea { min-height: 90px; resize: vertical; }
+    button {
+      padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px;
+      background: #fff; color: var(--text); cursor: pointer;
+    }
+    button.primary { background: var(--text); color: #fff; border-color: var(--text); }
+    .button-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    .button-row button { flex: 1 1 140px; }
+    .status { margin-top: 14px; color: #106d2d; font-weight: bold; min-height: 1.2em; }
+    .summary-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 14px 0 22px; }
+    .summary-card { border: 1px solid var(--border); padding: 12px; border-radius: 12px; background: var(--card); }
+    .summary-title { font-size: 13px; color: var(--muted); margin-bottom: 5px; }
+    .summary-value { font-size: 20px; font-weight: bold; line-height: 1.2; word-break: break-word; }
+    .table-wrap { overflow-x: auto; margin-top: 14px; border: 1px solid var(--border); border-radius: 12px; background: #fff; }
+    table { border-collapse: collapse; min-width: 1800px; width: 100%; }
+    th, td {
+      border-bottom: 1px solid var(--border); border-right: 1px solid var(--border);
+      padding: 8px; text-align: left; font-size: 14px; white-space: nowrap; vertical-align: top;
+    }
+    th:last-child, td:last-child { border-right: none; } th { background: #f3f3f3; }
+    .backup-box { min-height: 160px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
+    .small, .weekly-note, .definition-box { color: var(--muted); line-height: 1.5; font-size: 13px; }
+    .definition-box { border: 1px solid var(--border); background: #f9f9f9; padding: 12px; margin: 12px 0 20px; border-radius: 12px; color: #444; }
+    .manual-weight { display: none; margin-top: 8px; }
+    .tab-section { display: none; } .tab-section.active { display: block; }
+    .bottom-nav {
+      position: fixed; left: 0; right: 0; bottom: 0; padding-bottom: var(--safe-bottom); background: var(--nav-bg);
+      border-top: 1px solid var(--border); display: grid; grid-template-columns: repeat(3, 1fr); z-index: 10;
+    }
+    .nav-btn { border: none; border-radius: 0; background: transparent; padding: 12px 8px; color: var(--nav-inactive); font-weight: bold; }
+    .nav-btn.active { color: var(--nav-active); } .nav-label { display: block; font-size: 14px; }
+    .section-card { border: 1px solid var(--border); border-radius: 12px; padding: 14px; background: #fff; margin-top: 14px; }
+    @media (max-width: 640px) {
+      .summary-grid { grid-template-columns: 1fr; } .button-row button { flex: 1 1 calc(50% - 8px); }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>Strength Tracker</h1>
+      <div class="version">Version 1.1</div>
+    </header>
+
+    <section id="entryTab" class="tab-section active">
+      <h2>Entry</h2>
+      <label for="dateInput">Date</label>
+      <input id="dateInput" type="date" />
+
+      <div class="button-row">
+        <button id="todayBtn" type="button">Today</button>
+        <button id="lastEntryBtn" type="button">Last Entry</button>
+        <button id="loadBtn" type="button">Load Date</button>
+        <button id="copyLastBtn" type="button">Copy Last Weights</button>
+      </div>
+
+      <label for="weight">Body Weight (kg)</label>
+      <input id="weight" type="number" min="0" step="0.1" />
+      <label for="pushupsMax">Push-ups Max (reps)</label>
+      <input id="pushupsMax" type="number" min="0" />
+      <label for="pushupsTotal">Push-ups Total (reps)</label>
+      <input id="pushupsTotal" type="number" min="0" />
+
+      <label for="rows">Rows Reps</label>
+      <input id="rows" type="number" min="0" />
+      <label for="rowsWeightSelect">Rows Weight (kg)</label>
+      <select id="rowsWeightSelect"><option value=""></option><option value="10">10</option><option value="16">16</option><option value="20">20</option><option value="other">Other</option></select>
+      <input id="rowsWeightManual" class="manual-weight" type="number" min="0" step="0.1" placeholder="Enter custom rows weight" />
+
+      <label for="press">Press Reps</label>
+      <input id="press" type="number" min="0" />
+      <label for="pressWeightSelect">Press Weight (kg)</label>
+      <select id="pressWeightSelect"><option value=""></option><option value="10">10</option><option value="16">16</option><option value="20">20</option><option value="other">Other</option></select>
+      <input id="pressWeightManual" class="manual-weight" type="number" min="0" step="0.1" placeholder="Enter custom press weight" />
+
+      <label for="bicepCurls">Bicep Curls Reps</label>
+      <input id="bicepCurls" type="number" min="0" />
+      <label for="bicepCurlsWeightSelect">Bicep Curls Weight (kg)</label>
+      <select id="bicepCurlsWeightSelect"><option value=""></option><option value="10">10</option><option value="16">16</option><option value="20">20</option><option value="other">Other</option></select>
+      <input id="bicepCurlsWeightManual" class="manual-weight" type="number" min="0" step="0.1" placeholder="Enter custom bicep curl weight" />
+
+      <label for="hammerCurls">Hammer Curls Reps</label>
+      <input id="hammerCurls" type="number" min="0" />
+      <label for="hammerCurlsWeightSelect">Hammer Curls Weight (kg)</label>
+      <select id="hammerCurlsWeightSelect"><option value=""></option><option value="10">10</option><option value="16">16</option><option value="20">20</option><option value="other">Other</option></select>
+      <input id="hammerCurlsWeightManual" class="manual-weight" type="number" min="0" step="0.1" placeholder="Enter custom hammer curl weight" />
+
+      <label for="tri">Triceps Reps</label>
+      <input id="tri" type="number" min="0" />
+      <label for="triWeightSelect">Triceps Weight (kg)</label>
+      <select id="triWeightSelect"><option value=""></option><option value="10">10</option><option value="16">16</option><option value="20">20</option><option value="other">Other</option></select>
+      <input id="triWeightManual" class="manual-weight" type="number" min="0" step="0.1" placeholder="Enter custom triceps weight" />
+
+      <label for="squats">Squats Reps</label>
+      <input id="squats" type="number" min="0" />
+      <label for="squatsWeightSelect">Squats Weight (kg)</label>
+      <select id="squatsWeightSelect"><option value=""></option><option value="10">10</option><option value="16">16</option><option value="20">20</option><option value="other">Other</option></select>
+      <input id="squatsWeightManual" class="manual-weight" type="number" min="0" step="0.1" placeholder="Enter custom squats weight" />
+
+      <label for="rucked">Rucked</label>
+      <select id="rucked"><option value=""></option><option value="Yes">Yes</option><option value="No">No</option></select>
+      <label for="ran">Ran</label>
+      <select id="ran"><option value=""></option><option value="Yes">Yes</option><option value="No">No</option></select>
+
+      <label for="armL">Arm Size Left (cm, weekly)</label>
+      <input id="armL" type="number" min="0" step="0.1" />
+      <label for="armR">Arm Size Right (cm, weekly)</label>
+      <input id="armR" type="number" min="0" step="0.1" />
+      <div class="weekly-note">Tip: measure arms once a week, ideally same day, same time, same conditions.</div>
+
+      <label for="notes">Notes</label>
+      <textarea id="notes"></textarea>
+
+      <div class="button-row">
+        <button id="saveBtn" class="primary" type="button">Save</button>
+        <button id="clearBtn" type="button">Clear This Date</button>
+      </div>
+
+      <div id="status" class="status"></div>
+    </section>
+
+    <section id="progressTab" class="tab-section">
+      <h2>Progress</h2>
+
+      <h3>Summary</h3>
+      <div class="summary-grid">
+        <div class="summary-card"><div class="summary-title">Latest Weight (kg)</div><div class="summary-value" id="latestWeight">-</div></div>
+        <div class="summary-card"><div class="summary-title">Best Push-ups Max</div><div class="summary-value" id="bestPushupsMax">-</div></div>
+        <div class="summary-card"><div class="summary-title">Total Push-ups To Date</div><div class="summary-value" id="totalPushups">-</div></div>
+        <div class="summary-card"><div class="summary-title">Latest Arms (cm)</div><div class="summary-value" id="latestArms">-</div></div>
+        <div class="summary-card"><div class="summary-title">Total Ruck Days</div><div class="summary-value" id="ruckDays">-</div></div>
+        <div class="summary-card"><div class="summary-title">Total Run Days</div><div class="summary-value" id="runDays">-</div></div>
+        <div class="summary-card"><div class="summary-title">Entries Logged</div><div class="summary-value" id="entryCount">-</div></div>
+        <div class="summary-card"><div class="summary-title">Latest Logged Date</div><div class="summary-value" id="latestDate">-</div></div>
+      </div>
+
+      <h3>Baseline vs Latest</h3>
+      <div class="summary-grid">
+        <div class="summary-card"><div class="summary-title">Push-ups Max</div><div class="summary-value" id="pushupsTrend">-</div></div>
+        <div class="summary-card"><div class="summary-title">Body Weight (kg)</div><div class="summary-value" id="weightTrend">-</div></div>
+        <div class="summary-card"><div class="summary-title">Arms Average (cm)</div><div class="summary-value" id="armsTrend">-</div></div>
+      </div>
+
+      <h3>Records / Bests</h3>
+      <div class="summary-grid">
+        <div class="summary-card"><div class="summary-title">Best Push-ups Max</div><div class="summary-value" id="recordPushupsMax">-</div></div>
+        <div class="summary-card"><div class="summary-title">Best Push-ups Total</div><div class="summary-value" id="recordPushupsTotal">-</div></div>
+        <div class="summary-card"><div class="summary-title">Best Rows</div><div class="summary-value" id="recordRows">-</div></div>
+        <div class="summary-card"><div class="summary-title">Best Press</div><div class="summary-value" id="recordPress">-</div></div>
+        <div class="summary-card"><div class="summary-title">Best Bicep Curls</div><div class="summary-value" id="recordBicepCurls">-</div></div>
+        <div class="summary-card"><div class="summary-title">Best Hammer Curls</div><div class="summary-value" id="recordHammerCurls">-</div></div>
+        <div class="summary-card"><div class="summary-title">Best Triceps</div><div class="summary-value" id="recordTriceps">-</div></div>
+        <div class="summary-card"><div class="summary-title">Best Squats</div><div class="summary-value" id="recordSquats">-</div></div>
+        <div class="summary-card"><div class="summary-title">Push-ups This Week</div><div class="summary-value" id="weeklyPushups">-</div></div>
+      </div>
+
+      <h3>Progress Tracker</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th><th>Weight (kg)</th><th>Push-ups Max</th><th>Push-ups Total</th>
+              <th>Rows Reps</th><th>Rows Kg</th><th>Press Reps</th><th>Press Kg</th>
+              <th>Bicep Reps</th><th>Bicep Kg</th><th>Hammer Reps</th><th>Hammer Kg</th>
+              <th>Triceps Reps</th><th>Triceps Kg</th><th>Squats Reps</th><th>Squats Kg</th>
+              <th>Rucked</th><th>Ran</th><th>Arm L</th><th>Arm R</th><th>Notes</th>
+            </tr>
+          </thead>
+          <tbody id="progressBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="settingsTab" class="tab-section">
+      <h2>Settings</h2>
+      <div class="definition-box">
+        <strong>How to log:</strong><br />
+        Push-ups Max = biggest push-up set that day.<br />
+        Push-ups Total = total push-ups for the whole workout.<br />
+        Rows Reps = best working set reps per side.<br />
+        Press Reps = best working set reps.<br />
+        Bicep Curls Reps = best working set reps.<br />
+        Hammer Curls Reps = best working set reps.<br />
+        Triceps Reps = best working set reps.<br />
+        Squats Reps = best working set reps.<br />
+        Use the weight dropdowns for fast entry. Pick Other only if you use a different load.
+      </div>
+
+      <div class="section-card">
+        <h3>Backup</h3>
+        <div class="button-row">
+          <button id="exportBtn" type="button">Export Backup</button>
+          <button id="importBtn" type="button">Import Backup</button>
+        </div>
+        <label for="backupBox">Backup Data</label>
+        <textarea id="backupBox" class="backup-box"></textarea>
+        <div class="small">Copy this JSON as a backup. Paste it back in here and tap Import Backup to restore.</div>
+      </div>
+
+      <div class="section-card">
+        <h3>About</h3>
+        <div class="small">Strength Tracker Version 1.1<br />Offline-first tracker using localStorage.<br />Data stays in your browser unless you export it.</div>
+      </div>
+    </section>
+  </div>
+
+  <nav class="bottom-nav">
+    <button class="nav-btn active" data-tab="entryTab" type="button"><span class="nav-label">Entry</span></button>
+    <button class="nav-btn" data-tab="progressTab" type="button"><span class="nav-label">Progress</span></button>
+    <button class="nav-btn" data-tab="settingsTab" type="button"><span class="nav-label">Settings</span></button>
+  </nav>
+
+  <script>
+    var trackedFields = ["weight","pushupsMax","pushupsTotal","rows","rowsWeight","press","pressWeight","bicepCurls","bicepCurlsWeight","hammerCurls","hammerCurlsWeight","tri","triWeight","squats","squatsWeight","rucked","ran","armL","armR"];
+    var carryForwardFields = ["rowsWeight","pressWeight","bicepCurlsWeight","hammerCurlsWeight","triWeight","squatsWeight"];
+    var weightFieldMap = {
+      rowsWeight: { selectId: "rowsWeightSelect", manualId: "rowsWeightManual" },
+      pressWeight: { selectId: "pressWeightSelect", manualId: "pressWeightManual" },
+      bicepCurlsWeight: { selectId: "bicepCurlsWeightSelect", manualId: "bicepCurlsWeightManual" },
+      hammerCurlsWeight: { selectId: "hammerCurlsWeightSelect", manualId: "hammerCurlsWeightManual" },
+      triWeight: { selectId: "triWeightSelect", manualId: "triWeightManual" },
+      squatsWeight: { selectId: "squatsWeightSelect", manualId: "squatsWeightManual" }
+    };
+
+    function showTab(tabId) {
+      document.querySelectorAll(".tab-section").forEach(function(s){ s.classList.remove("active"); });
+      document.querySelectorAll(".nav-btn").forEach(function(b){ b.classList.remove("active"); });
+      document.getElementById(tabId).classList.add("active");
+      document.querySelector('.nav-btn[data-tab="' + tabId + '"]').classList.add("active");
+      window.scrollTo(0, 0);
+    }
+
+    function formatDateKey(d) { return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+    function displayDate(dateKey) { var parts = dateKey.split("-"); return parts[2]+"/"+parts[1]+"/"+parts[0]; }
+    function todayKey() { return formatDateKey(new Date()); }
+    function isDateKey(key) { return !!key && key.length === 10 && key.charAt(4) === "-" && key.charAt(7) === "-"; }
+
+    function getSavedDates() {
+      var dates = [];
+      for (var i = 0; i < localStorage.length; i++) {
+        var key = localStorage.key(i);
+        if (isDateKey(key)) dates.push(key);
+      }
+      dates.sort();
+      return dates;
+    }
+
+    function getData(date) {
+      var raw = localStorage.getItem(date);
+      if (!raw) return {};
+      try { return JSON.parse(raw); } catch (e) { return {}; }
+    }
+
+    function hasAnyRealValue(data) {
+      for (var i = 0; i < trackedFields.length; i++) {
+        var f = trackedFields[i];
+        if (data[f] !== "" && data[f] !== null && data[f] !== undefined) return true;
+      }
+      return !!(data.notes && data.notes.trim() !== "");
+    }
+
+    function setFieldValue(field, value) { var el = document.getElementById(field); if (el) el.value = value || ""; }
+    function getFieldValue(field) { var el = document.getElementById(field); return el ? el.value.trim() : ""; }
+
+    function toggleManualWeight(selectId, manualId) {
+      var select = document.getElementById(selectId);
+      var manual = document.getElementById(manualId);
+      if (select.value === "other") { manual.style.display = "block"; } else { manual.style.display = "none"; manual.value = ""; }
+    }
+
+    function getWeightValue(selectId, manualId) {
+      var select = document.getElementById(selectId);
+      var manual = document.getElementById(manualId);
+      return select.value === "other" ? manual.value.trim() : select.value;
+    }
+
+    function setWeightValue(selectId, manualId, savedValue) {
+      var select = document.getElementById(selectId);
+      var manual = document.getElementById(manualId);
+      var value = savedValue === undefined || savedValue === null ? "" : String(savedValue);
+      if (value === "") {
+        select.value = ""; manual.value = ""; manual.style.display = "none";
+      } else if (value === "10" || value === "16" || value === "20") {
+        select.value = value; manual.value = ""; manual.style.display = "none";
+      } else {
+        select.value = "other"; manual.value = value; manual.style.display = "block";
+      }
+    }
+
+    function clearFields() {
+      trackedFields.forEach(function(field){
+        if (weightFieldMap[field]) setWeightValue(weightFieldMap[field].selectId, weightFieldMap[field].manualId, "");
+        else setFieldValue(field, "");
+      });
+      document.getElementById("notes").value = "";
+    }
+
+    function loadDay() {
+      var selectedDate = document.getElementById("dateInput").value;
+      if (!selectedDate) { clearFields(); return; }
+      var data = getData(selectedDate);
+      trackedFields.forEach(function(field){
+        if (weightFieldMap[field]) setWeightValue(weightFieldMap[field].selectId, weightFieldMap[field].manualId, data[field] || "");
+        else setFieldValue(field, data[field] || "");
+      });
+      document.getElementById("notes").value = data.notes || "";
+      document.getElementById("status").textContent = "Loaded " + displayDate(selectedDate);
+    }
+
+    function validateNonNegativeValue(value) { if (value === "") return true; var num = parseFloat(value); return !isNaN(num) && num >= 0; }
+    function validateNonNegative(fieldId, label) {
+      var value = getFieldValue(fieldId);
+      if (validateNonNegativeValue(value)) return true;
+      document.getElementById("status").textContent = label + " must be 0 or more.";
+      return false;
+    }
+    function validateWeightField(fieldName, label) {
+      var map = weightFieldMap[fieldName];
+      var value = getWeightValue(map.selectId, map.manualId);
+      if (validateNonNegativeValue(value)) return true;
+      document.getElementById("status").textContent = label + " must be 0 or more.";
+      return false;
+    }
+
+    function validateForm() {
+      var checks = [["weight","Body Weight"],["pushupsMax","Push-ups Max"],["pushupsTotal","Push-ups Total"],["rows","Rows Reps"],["press","Press Reps"],["bicepCurls","Bicep Curls Reps"],["hammerCurls","Hammer Curls Reps"],["tri","Triceps Reps"],["squats","Squats Reps"],["armL","Arm Size Left"],["armR","Arm Size Right"]];
+      for (var i = 0; i < checks.length; i++) if (!validateNonNegative(checks[i][0], checks[i][1])) return false;
+      var weightChecks = [["rowsWeight","Rows Weight"],["pressWeight","Press Weight"],["bicepCurlsWeight","Bicep Curls Weight"],["hammerCurlsWeight","Hammer Curls Weight"],["triWeight","Triceps Weight"],["squatsWeight","Squats Weight"]];
+      for (var j = 0; j < weightChecks.length; j++) if (!validateWeightField(weightChecks[j][0], weightChecks[j][1])) return false;
+      var maxPush = getFieldValue("pushupsMax");
+      var totalPush = getFieldValue("pushupsTotal");
+      if (maxPush !== "" && totalPush !== "" && parseFloat(totalPush) < parseFloat(maxPush)) {
+        document.getElementById("status").textContent = "Push-ups Total cannot be less than Push-ups Max.";
+        return false;
+      }
+      return true;
+    }
+
+    function saveDay() {
+      var selectedDate = document.getElementById("dateInput").value;
+      if (!selectedDate) { document.getElementById("status").textContent = "Choose a date first."; return; }
+      if (!validateForm()) return;
+
+      var data = {
+        weight: getFieldValue("weight"),
+        pushupsMax: getFieldValue("pushupsMax"),
+        pushupsTotal: getFieldValue("pushupsTotal"),
+        rows: getFieldValue("rows"),
+        rowsWeight: getWeightValue("rowsWeightSelect", "rowsWeightManual"),
+        press: getFieldValue("press"),
+        pressWeight: getWeightValue("pressWeightSelect", "pressWeightManual"),
+        bicepCurls: getFieldValue("bicepCurls"),
+        bicepCurlsWeight: getWeightValue("bicepCurlsWeightSelect", "bicepCurlsWeightManual"),
+        hammerCurls: getFieldValue("hammerCurls"),
+        hammerCurlsWeight: getWeightValue("hammerCurlsWeightSelect", "hammerCurlsWeightManual"),
+        tri: getFieldValue("tri"),
+        triWeight: getWeightValue("triWeightSelect", "triWeightManual"),
+        squats: getFieldValue("squats"),
+        squatsWeight: getWeightValue("squatsWeightSelect", "squatsWeightManual"),
+        rucked: getFieldValue("rucked"),
+        ran: getFieldValue("ran"),
+        armL: getFieldValue("armL"),
+        armR: getFieldValue("armR"),
+        notes: document.getElementById("notes").value.trim()
+      };
+
+      if (hasAnyRealValue(data)) {
+        localStorage.setItem(selectedDate, JSON.stringify(data));
+        document.getElementById("status").textContent = "Saved for " + displayDate(selectedDate);
+      } else {
+        localStorage.removeItem(selectedDate);
+        document.getElementById("status").textContent = "Empty date removed.";
+      }
+
+      showProgress(); updateSummary(); updateBackupBox();
+    }
+
+    function clearDay() {
+      var selectedDate = document.getElementById("dateInput").value;
+      if (!selectedDate) { document.getElementById("status").textContent = "Choose a date first."; return; }
+      localStorage.removeItem(selectedDate);
+      clearFields();
+      document.getElementById("status").textContent = "Cleared " + displayDate(selectedDate);
+      showProgress(); updateSummary(); updateBackupBox();
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;");
+    }
+
+    function showProgress() {
+      var tbody = document.getElementById("progressBody");
+      tbody.innerHTML = "";
+      var savedDates = getSavedDates();
+      savedDates.forEach(function(date){
+        var data = getData(date);
+        if (!hasAnyRealValue(data)) return;
+        var row = document.createElement("tr");
+        row.innerHTML =
+          "<td>"+displayDate(date)+"</td><td>"+escapeHtml(data.weight||"")+"</td><td>"+escapeHtml(data.pushupsMax||"")+"</td><td>"+escapeHtml(data.pushupsTotal||"")+"</td>" +
+          "<td>"+escapeHtml(data.rows||"")+"</td><td>"+escapeHtml(data.rowsWeight||"")+"</td><td>"+escapeHtml(data.press||"")+"</td><td>"+escapeHtml(data.pressWeight||"")+"</td>" +
+          "<td>"+escapeHtml(data.bicepCurls||"")+"</td><td>"+escapeHtml(data.bicepCurlsWeight||"")+"</td><td>"+escapeHtml(data.hammerCurls||"")+"</td><td>"+escapeHtml(data.hammerCurlsWeight||"")+"</td>" +
+          "<td>"+escapeHtml(data.tri||"")+"</td><td>"+escapeHtml(data.triWeight||"")+"</td><td>"+escapeHtml(data.squats||"")+"</td><td>"+escapeHtml(data.squatsWeight||"")+"</td>" +
+          "<td>"+escapeHtml(data.rucked||"")+"</td><td>"+escapeHtml(data.ran||"")+"</td><td>"+escapeHtml(data.armL||"")+"</td><td>"+escapeHtml(data.armR||"")+"</td><td>"+escapeHtml(data.notes||"")+"</td>";
+        tbody.appendChild(row);
+      });
+    }
+
+    function toNum(v) { var n = parseFloat(v); return isNaN(n) ? null : n; }
+    function latestValue(field) { var dates = getSavedDates(); for (var i = dates.length-1; i >= 0; i--) { var value = toNum(getData(dates[i])[field]); if (value !== null) return value; } return null; }
+    function firstValue(field) { var dates = getSavedDates(); for (var i = 0; i < dates.length; i++) { var value = toNum(getData(dates[i])[field]); if (value !== null) return value; } return null; }
+    function bestValue(field) { var dates = getSavedDates(), best = null; for (var i = 0; i < dates.length; i++) { var value = toNum(getData(dates[i])[field]); if (value !== null && (best === null || value > best)) best = value; } return best; }
+    function totalValue(field) { var dates = getSavedDates(), total = 0, found = false; for (var i = 0; i < dates.length; i++) { var value = toNum(getData(dates[i])[field]); if (value !== null) { total += value; found = true; } } return found ? total : null; }
+    function countYesDays(field) { var dates = getSavedDates(), count = 0; for (var i = 0; i < dates.length; i++) { if (getData(dates[i])[field] === "Yes") count++; } return count; }
+
+    function firstArmAverage() {
+      var dates = getSavedDates();
+      for (var i = 0; i < dates.length; i++) {
+        var data = getData(dates[i]), l = toNum(data.armL), r = toNum(data.armR);
+        if (l !== null && r !== null) return ((l+r)/2).toFixed(1);
+        if (l !== null) return l.toFixed(1);
+        if (r !== null) return r.toFixed(1);
+      }
+      return null;
+    }
+
+    function latestArmAverage() {
+      var dates = getSavedDates();
+      for (var i = dates.length-1; i >= 0; i--) {
+        var data = getData(dates[i]), l = toNum(data.armL), r = toNum(data.armR);
+        if (l !== null && r !== null) return ((l+r)/2).toFixed(1);
+        if (l !== null) return l.toFixed(1);
+        if (r !== null) return r.toFixed(1);
+      }
+      return null;
+    }
+
+    function bestLiftRecord(repsField, weightField) {
+      var dates = getSavedDates(), best = null;
+      for (var i = 0; i < dates.length; i++) {
+        var data = getData(dates[i]), reps = toNum(data[repsField]), weight = toNum(data[weightField]);
+        if (reps === null) continue;
+        var score = weight !== null ? (weight * 1000 + reps) : reps;
+        if (best === null || score > best.score) best = { reps: reps, weight: weight, score: score };
+      }
+      if (best === null) return null;
+      return best.weight !== null ? (best.reps + " @ " + best.weight + "kg") : String(best.reps);
+    }
+
+    function startOfWeek(date) {
+      var d = new Date(date), day = d.getDay(), diff = day === 0 ? -6 : 1 - day;
+      d.setDate(d.getDate() + diff); d.setHours(0,0,0,0); return d;
+    }
+
+    function weeklyTotal(field) {
+      var dates = getSavedDates(), now = new Date(), weekStart = startOfWeek(now), total = 0, found = false;
+      for (var i = 0; i < dates.length; i++) {
+        var parts = dates[i].split("-"), dateObj = new Date(parts[0], parts[1]-1, parts[2]);
+        dateObj.setHours(0,0,0,0);
+        if (dateObj >= weekStart) {
+          var value = toNum(getData(dates[i])[field]);
+          if (value !== null) { total += value; found = true; }
+        }
+      }
+      return found ? total : null;
+    }
+
+    function setSummary(id, value) {
+      var el = document.getElementById(id);
+      if (el) el.textContent = (value === null || value === undefined || value === "") ? "-" : value;
+    }
+
+    function updateSummary() {
+      var dates = getSavedDates();
+      var latestArmL = latestValue("armL"), latestArmR = latestValue("armR");
+      setSummary("latestWeight", latestValue("weight"));
+      setSummary("bestPushupsMax", bestValue("pushupsMax"));
+      setSummary("totalPushups", totalValue("pushupsTotal"));
+      setSummary("latestArms", (latestArmL !== null || latestArmR !== null) ? ((latestArmL !== null ? latestArmL : "-") + " / " + (latestArmR !== null ? latestArmR : "-")) : "-");
+      setSummary("ruckDays", countYesDays("rucked"));
+      setSummary("runDays", countYesDays("ran"));
+      setSummary("entryCount", dates.length);
+      setSummary("latestDate", dates.length ? displayDate(dates[dates.length - 1]) : "-");
+
+      var firstPush = firstValue("pushupsMax"), lastPush = latestValue("pushupsMax");
+      var firstWeight = firstValue("weight"), lastWeight = latestValue("weight");
+      var firstArms = firstArmAverage(), lastArms = latestArmAverage();
+
+      setSummary("pushupsTrend", (firstPush !== null && lastPush !== null) ? (firstPush + " → " + lastPush) : "-");
+      setSummary("weightTrend", (firstWeight !== null && lastWeight !== null) ? (firstWeight + " → " + lastWeight) : "-");
+      setSummary("armsTrend", (firstArms !== null && lastArms !== null) ? (firstArms + " → " + lastArms) : "-");
+
+      setSummary("recordPushupsMax", bestValue("pushupsMax"));
+      setSummary("recordPushupsTotal", bestValue("pushupsTotal"));
+      setSummary("recordRows", bestLiftRecord("rows","rowsWeight"));
+      setSummary("recordPress", bestLiftRecord("press","pressWeight"));
+      setSummary("recordBicepCurls", bestLiftRecord("bicepCurls","bicepCurlsWeight"));
+      setSummary("recordHammerCurls", bestLiftRecord("hammerCurls","hammerCurlsWeight"));
+      setSummary("recordTriceps", bestLiftRecord("tri","triWeight"));
+      setSummary("recordSquats", bestLiftRecord("squats","squatsWeight"));
+      setSummary("weeklyPushups", weeklyTotal("pushupsTotal"));
+    }
+
+    function exportBackup() {
+      var savedDates = getSavedDates(), exportData = {};
+      savedDates.forEach(function(date){ var data = getData(date); if (hasAnyRealValue(data)) exportData[date] = data; });
+      document.getElementById("backupBox").value = JSON.stringify(exportData, null, 2);
+      document.getElementById("status").textContent = "Backup exported.";
+      showTab("settingsTab");
+    }
+
+    function importBackup() {
+      var text = document.getElementById("backupBox").value.trim();
+      if (!text) { document.getElementById("status").textContent = "Backup box is empty."; showTab("settingsTab"); return; }
+      var importData;
+      try { importData = JSON.parse(text); } catch (e) { document.getElementById("status").textContent = "Backup is not valid JSON."; showTab("settingsTab"); return; }
+      for (var key in importData) if (isDateKey(key)) localStorage.setItem(key, JSON.stringify(importData[key]));
+      document.getElementById("status").textContent = "Backup imported.";
+      showProgress(); updateSummary(); updateBackupBox(); loadDay(); showTab("settingsTab");
+    }
+
+    function updateBackupBox() {
+      var savedDates = getSavedDates(), exportData = {};
+      savedDates.forEach(function(date){ var data = getData(date); if (hasAnyRealValue(data)) exportData[date] = data; });
+      document.getElementById("backupBox").value = JSON.stringify(exportData, null, 2);
+    }
+
+    function goToToday() { document.getElementById("dateInput").value = todayKey(); loadDay(); autoFillTodayWeightsIfBlank(); }
+    function goToLastEntry() {
+      var dates = getSavedDates();
+      if (!dates.length) { document.getElementById("status").textContent = "No saved entries yet."; return; }
+      document.getElementById("dateInput").value = dates[dates.length - 1]; loadDay();
+    }
+
+    function copyLastWeights() {
+      var dates = getSavedDates(), selectedDate = document.getElementById("dateInput").value;
+      if (!dates.length) { document.getElementById("status").textContent = "No previous entries to copy."; return; }
+      var sourceDate = null;
+      for (var i = dates.length-1; i >= 0; i--) { if (dates[i] !== selectedDate) { sourceDate = dates[i]; break; } }
+      if (!sourceDate) { document.getElementById("status").textContent = "No previous entry found."; return; }
+      var data = getData(sourceDate);
+      carryForwardFields.forEach(function(field){
+        var map = weightFieldMap[field];
+        setWeightValue(map.selectId, map.manualId, data[field] || "");
+      });
+      document.getElementById("status").textContent = "Copied last weights from " + displayDate(sourceDate);
+    }
+
+    function autoFillTodayWeightsIfBlank() {
+      var selectedDate = document.getElementById("dateInput").value;
+      if (selectedDate !== todayKey()) return;
+      if (hasAnyRealValue(getData(selectedDate))) return;
+      var dates = getSavedDates();
+      if (!dates.length) return;
+      var sourceDate = null;
+      for (var i = dates.length-1; i >= 0; i--) { if (dates[i] !== selectedDate) { sourceDate = dates[i]; break; } }
+      if (!sourceDate) return;
+      var data = getData(sourceDate);
+      carryForwardFields.forEach(function(field){
+        var map = weightFieldMap[field];
+        setWeightValue(map.selectId, map.manualId, data[field] || "");
+      });
+      document.getElementById("status").textContent = "Loaded today. Last weights copied from " + displayDate(sourceDate);
+    }
+
+    document.addEventListener("DOMContentLoaded", function() {
+      document.getElementById("dateInput").value = todayKey();
+      document.querySelectorAll(".nav-btn").forEach(function(btn){ btn.addEventListener("click", function(){ showTab(this.getAttribute("data-tab")); }); });
+      Object.keys(weightFieldMap).forEach(function(field){
+        var map = weightFieldMap[field];
+        document.getElementById(map.selectId).addEventListener("change", function(){ toggleManualWeight(map.selectId, map.manualId); });
+      });
+      document.getElementById("todayBtn").addEventListener("click", goToToday);
+      document.getElementById("lastEntryBtn").addEventListener("click", goToLastEntry);
+      document.getElementById("loadBtn").addEventListener("click", loadDay);
+      document.getElementById("copyLastBtn").addEventListener("click", copyLastWeights);
+      document.getElementById("saveBtn").addEventListener("click", saveDay);
+      document.getElementById("clearBtn").addEventListener("click", clearDay);
+      document.getElementById("exportBtn").addEventListener("click", exportBackup);
+      document.getElementById("importBtn").addEventListener("click", importBackup);
+
+      loadDay(); autoFillTodayWeightsIfBlank(); showProgress(); updateSummary(); updateBackupBox();
+    });
+  </script>
+</body>
+</html>
